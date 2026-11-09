@@ -1,0 +1,10 @@
+PAWMOIRE replaceable product image slots
+
+Main card / detail image:
+p1-main.jpg through p8-main.jpg
+
+Optional detail gallery images (only shown if listed in productsData):
+p1-detail-1.jpg, p1-detail-2.jpg, p2-detail-1.jpg ...
+
+Keep filenames and update productsData.detailImages to show extra gallery images.
+Do not use third-party product photos without permission.

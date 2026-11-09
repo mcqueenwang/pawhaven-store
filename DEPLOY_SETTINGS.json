@@ -1,0 +1,7 @@
+{
+  "framework": "static-html",
+  "publish_directory": ".",
+  "build_command": null,
+  "entry_file": "index.html",
+  "requires_backend_for_live_orders": true
+}

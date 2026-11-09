@@ -1,0 +1,62 @@
+{
+  "project": "PAWMOIRE V3 · Customer Journey Plus",
+  "snapshot_date": "2026-11-09",
+  "snapshot_origin": "Existing PAWMOIRE V3 Customer Journey Plus source snapshot",
+  "portable_as_static_site": true,
+  "frontend_entry": "index.html",
+  "architecture": "Single HTML file with embedded CSS and JavaScript; separate assets files",
+  "components": [
+    {
+      "name": "Home / hero",
+      "type": "HTML/CSS section"
+    },
+    {
+      "name": "Collection router",
+      "type": "JavaScript querystring routing",
+      "routes": [
+        "?collection=custom",
+        "?collection=wearables",
+        "?collection=toys",
+        "?collection=treats"
+      ]
+    },
+    {
+      "name": "Product catalogue",
+      "type": "productsData JavaScript array"
+    },
+    {
+      "name": "Product detail modal",
+      "type": "HTML/CSS/JavaScript"
+    },
+    {
+      "name": "Product options and detail copy",
+      "type": "productFlowData JavaScript object"
+    },
+    {
+      "name": "Photo upload preview",
+      "type": "client-side FileReader; not server-stored"
+    },
+    {
+      "name": "Cart demo",
+      "type": "JavaScript memory state; not a real order backend"
+    },
+    {
+      "name": "Brand assets",
+      "type": "bundled image and SVG files"
+    }
+  ],
+  "unimplemented": [
+    "Shopify checkout",
+    "payment collection",
+    "server-side upload persistence",
+    "production order database",
+    "staff approval portal",
+    "customer proof notification",
+    "fulfillment integration"
+  ],
+  "secrets_included": false,
+  "deployment_note": "Static file hosting (Netlify / Cloudflare Pages / Vercel / any HTML host), no npm build step required for this snapshot",
+  "brand": "PAWMOIRE",
+  "brand_asset": "assets/brand/pawmoire-lockup.png",
+  "brand_update_note": "Approved PAWMOIRE logo applied to site and product mockups. Existing layout, styles, hero photography, product order and interaction logic preserved."
+}
