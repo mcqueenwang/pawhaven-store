@@ -1,0 +1,37 @@
+name: Export PAWMOIRE source archive
+
+on:
+  push:
+    branches:
+      - export/pawmoire-source-2026-11-15
+    paths:
+      - .github/workflows/export-source.yml
+
+permissions:
+  contents: read
+
+jobs:
+  package-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact repository snapshot
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Package tracked source and assets
+        shell: bash
+        run: |
+          mkdir -p dist
+          git archive --format=zip --output=dist/PAWMOIRE_V3_Full_Source_2026-11-15.zip HEAD
+          sha256sum dist/PAWMOIRE_V3_Full_Source_2026-11-15.zip > dist/PAWMOIRE_V3_Full_Source_2026-11-15.zip.sha256
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PAWMOIRE_V3_Full_Source_2026-11-15
+          path: |
+            dist/PAWMOIRE_V3_Full_Source_2026-11-15.zip
+            dist/PAWMOIRE_V3_Full_Source_2026-11-15.zip.sha256
+          if-no-files-found: error
+          retention-days: 1
