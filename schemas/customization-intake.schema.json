@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PAWMOIRE customization intake record",
+  "description": "Contract for future secure server-side intake. Does not itself store or transmit customer information.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "customizationId",
+    "productId",
+    "quantity",
+    "customerEmail",
+    "photoObjectKey",
+    "proofStatus",
+    "createdAt"
+  ],
+  "properties": {
+    "customizationId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128
+    },
+    "productId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "customerEmail": {
+      "type": "string",
+      "format": "email",
+      "maxLength": 254
+    },
+    "petName": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "photoPreference": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "selectedOptions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 300
+      },
+      "maxProperties": 20
+    },
+    "photoObjectKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Private object-storage key, never a public URL or image data URI."
+    },
+    "shopifyOrderId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128
+    },
+    "proofStatus": {
+      "enum": [
+        "draft",
+        "proof_sent",
+        "revision_requested",
+        "approved",
+        "in_production",
+        "shipped"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "approvedAt": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    }
+  }
+}
