@@ -1,0 +1,7 @@
+name = "pawmoire-api"
+main = "backend/cloudflare-worker.mjs"
+compatibility_date = "2026-11-25"
+
+[[kv_namespaces]]
+binding = "ORDERS"
+id = "128abfcf7a4d4eb5a7f311c89bddf571"
