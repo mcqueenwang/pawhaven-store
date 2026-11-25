@@ -1,8 +1,8 @@
 /**
  * PAWMOIRE customization intake + proof approval API (Cloudflare Worker).
- * NOT DEPLOYED. Requires R2 bucket PHOTOS, KV namespace ORDERS,
- * ADMIN_TOKEN, and ALLOWED_ORIGIN configured in Worker environment.
- * Photos remain private; never expose R2 object keys or admin token to browsers.
+ * Test Worker using KV namespace ORDERS for metadata and images.
+ * Configure ADMIN_TOKEN and ALLOWED_ORIGIN in the Worker environment.
+ * Never expose storage keys or the admin token to browsers.
  * KV is eventually consistent: do not use it as a payment or production ledger.
  */
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store",...headers}});
@@ -36,9 +36,9 @@ export default {async fetch(request,env){
   if(!selectedOptions||Array.isArray(selectedOptions)||typeof selectedOptions!=="object"||Object.keys(selectedOptions).length>20||Object.entries(selectedOptions).some(([k,v])=>k.length>100||typeof v!=="string"||v.length>300))return json({error:"Invalid options"},400,headers);
   if(form.get("photoConsent")!=="true")return json({error:"Photo permission is required"},400,headers);
   const id=crypto.randomUUID(),key="private/"+id+"."+allowedTypes.get(photo.type);
-  await env.PHOTOS.put(key,bytes,{httpMetadata:{contentType:photo.type}});
+  await env.ORDERS.put(key,bytes.buffer,{metadata:{contentType:photo.type}});
   const record={customizationId:id,productId,quantity,customerEmail:email,petName,notes,photoPreference,selectedOptions,photoObjectKey:key,shopifyOrderId:null,proofStatus:"draft",createdAt:new Date().toISOString(),approvedAt:null};
-  try{await env.ORDERS.put("order:"+id,JSON.stringify(record));}catch(e){await env.PHOTOS.delete(key);throw e;}
+  try{await env.ORDERS.put("order:"+id,JSON.stringify(record));}catch(e){await env.ORDERS.delete(key);throw e;}
   return json({customizationId:id,status:"draft",message:"Customization request received; payment has NOT been taken."},201,headers);
  }
  const matchAdmin=path.match(/^\/api\/admin\/customizations\/([a-f0-9-]{36})(?:\/(photo|proof))?$/);
@@ -46,9 +46,9 @@ export default {async fetch(request,env){
   if(!admin(request,env))return json({error:"Unauthorized"},401,headers);
   const record=await load(env,matchAdmin[1]);if(!record)return json({error:"Not found"},404,headers);
   if(request.method==="GET"&&matchAdmin[2]==="photo"){
-   const object=await env.PHOTOS.get(record.photoObjectKey);
-   if(!object)return json({error:"Original photo not found"},404,headers);
-   return new Response(object.body,{status:200,headers:{"content-type":object.httpMetadata?.contentType||"application/octet-stream","cache-control":"no-store",...headers}});
+   const object=await env.ORDERS.getWithMetadata(record.photoObjectKey,'arrayBuffer');
+   if(!object.value)return json({error:"Original photo not found"},404,headers);
+   return new Response(object.value,{status:200,headers:{"content-type":object.metadata?.contentType||"application/octet-stream","cache-control":"no-store",...headers}});
   }
   if(request.method==="GET"&&!matchAdmin[2])return json(record,200,headers);
   if(request.method==="POST"&&matchAdmin[2]==="proof"){
@@ -58,7 +58,7 @@ export default {async fetch(request,env){
    const bytes=new Uint8Array(await proof.arrayBuffer());
    if(!isImage(bytes,proof.type))return json({error:"Proof image content does not match its file type"},400,headers);
    const proofKey="private/proofs/"+record.customizationId+"."+allowedTypes.get(proof.type);
-   await env.PHOTOS.put(proofKey,bytes,{httpMetadata:{contentType:proof.type}});
+   await env.ORDERS.put(proofKey,bytes.buffer,{metadata:{contentType:proof.type}});
    const token=crypto.randomUUID()+"-"+crypto.randomUUID(),hash=await encode(token);
    record.proofObjectKey=proofKey;record.proofStatus="proof_sent";record.proofSentAt=new Date().toISOString();
    await env.ORDERS.put("order:"+record.customizationId,JSON.stringify(record));
@@ -76,9 +76,9 @@ export default {async fetch(request,env){
   if(!record||record.proofStatus!=="proof_sent")return json({error:"Proof is no longer awaiting review"},409,headers);
   if(request.method==="GET"&&matchProof[2]==="image"){
    if(!record.proofObjectKey)return json({error:"Design proof is not available"},404,headers);
-   const object=await env.PHOTOS.get(record.proofObjectKey);
-   if(!object)return json({error:"Design proof is not available"},404,headers);
-   return new Response(object.body,{status:200,headers:{"content-type":object.httpMetadata?.contentType||"application/octet-stream","cache-control":"no-store",...headers}});
+   const object=await env.ORDERS.getWithMetadata(record.proofObjectKey,'arrayBuffer');
+   if(!object.value)return json({error:"Design proof is not available"},404,headers);
+   return new Response(object.value,{status:200,headers:{"content-type":object.metadata?.contentType||"application/octet-stream","cache-control":"no-store",...headers}});
   }
   if(request.method==="GET"&&!matchProof[2])return json({petName:record.petName,productId:record.productId,proofStatus:record.proofStatus,proofImageUrl:"/api/proof/"+encodeURIComponent(matchProof[1])+"/image"},200,headers);
   if(request.method==="POST"&&matchProof[2]==="respond"){
