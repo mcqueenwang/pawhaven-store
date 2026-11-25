@@ -41,28 +41,47 @@ export default {async fetch(request,env){
   try{await env.ORDERS.put("order:"+id,JSON.stringify(record));}catch(e){await env.PHOTOS.delete(key);throw e;}
   return json({customizationId:id,status:"draft",message:"Customization request received; payment has NOT been taken."},201,headers);
  }
- const matchAdmin=path.match(/^\/api\/admin\/customizations\/([a-f0-9-]{36})(?:\/proof)?$/);
+ const matchAdmin=path.match(/^\/api\/admin\/customizations\/([a-f0-9-]{36})(?:\/(photo|proof))?$/);
  if(matchAdmin){
   if(!admin(request,env))return json({error:"Unauthorized"},401,headers);
   const record=await load(env,matchAdmin[1]);if(!record)return json({error:"Not found"},404,headers);
-  if(request.method==="GET"&&!path.endsWith("/proof"))return json(record,200,headers);
-  if(request.method==="POST"&&path.endsWith("/proof")){
+  if(request.method==="GET"&&matchAdmin[2]==="photo"){
+   const object=await env.PHOTOS.get(record.photoObjectKey);
+   if(!object)return json({error:"Original photo not found"},404,headers);
+   return new Response(object.body,{status:200,headers:{"content-type":object.httpMetadata?.contentType||"application/octet-stream","cache-control":"no-store",...headers}});
+  }
+  if(request.method==="GET"&&!matchAdmin[2])return json(record,200,headers);
+  if(request.method==="POST"&&matchAdmin[2]==="proof"){
    if(!["draft","revision_requested"].includes(record.proofStatus))return json({error:"Proof already pending or approved"},409,headers);
+   const form=await request.formData(),proof=form.get("proof");
+   if(!(proof instanceof File)||!allowedTypes.has(proof.type)||proof.size<1||proof.size>maxBytes)return json({error:"Upload a JPEG, PNG or WebP proof up to 8 MB"},400,headers);
+   const bytes=new Uint8Array(await proof.arrayBuffer());
+   if(!isImage(bytes,proof.type))return json({error:"Proof image content does not match its file type"},400,headers);
+   const proofKey="private/proofs/"+record.customizationId+"."+allowedTypes.get(proof.type);
+   await env.PHOTOS.put(proofKey,bytes,{httpMetadata:{contentType:proof.type}});
    const token=crypto.randomUUID()+"-"+crypto.randomUUID(),hash=await encode(token);
-   record.proofStatus="proof_sent";record.proofSentAt=new Date().toISOString();
+   record.proofObjectKey=proofKey;record.proofStatus="proof_sent";record.proofSentAt=new Date().toISOString();
    await env.ORDERS.put("order:"+record.customizationId,JSON.stringify(record));
    await env.ORDERS.put("proof:"+hash,record.customizationId,{expirationTtl:60*60*24*14});
-   return json({proofUrl:new URL("/proof-review.html?token="+encodeURIComponent(token),env.ALLOWED_ORIGIN).toString(),expiresInDays:14,warning:"Send this private link to the verified customer; the page must be deployed separately."},200,headers);
+   const proofUrl=new URL("/proof-review.html",env.ALLOWED_ORIGIN);
+   proofUrl.searchParams.set("token",token);proofUrl.searchParams.set("api",new URL(request.url).origin);
+   return json({proofUrl:proofUrl.toString(),expiresInDays:14,status:"proof_sent"},200,headers);
   }
  }
- const matchProof=path.match(/^\/api\/proof\/([a-f0-9-]{73})(?:\/respond)?$/);
+ const matchProof=path.match(/^\/api\/proof\/([a-f0-9-]{73})(?:\/(image|respond))?$/);
  if(matchProof){
   const id=await env.ORDERS.get("proof:"+await encode(matchProof[1]));
   if(!id)return json({error:"Invalid or expired proof link"},404,headers);
   const record=await load(env,id);
   if(!record||record.proofStatus!=="proof_sent")return json({error:"Proof is no longer awaiting review"},409,headers);
-  if(request.method==="GET"&&!path.endsWith("/respond"))return json({petName:record.petName,productId:record.productId,proofStatus:record.proofStatus,notice:"Please review the design proof provided separately by PAWMOIRE."},200,headers);
-  if(request.method==="POST"&&path.endsWith("/respond")){
+  if(request.method==="GET"&&matchProof[2]==="image"){
+   if(!record.proofObjectKey)return json({error:"Design proof is not available"},404,headers);
+   const object=await env.PHOTOS.get(record.proofObjectKey);
+   if(!object)return json({error:"Design proof is not available"},404,headers);
+   return new Response(object.body,{status:200,headers:{"content-type":object.httpMetadata?.contentType||"application/octet-stream","cache-control":"no-store",...headers}});
+  }
+  if(request.method==="GET"&&!matchProof[2])return json({petName:record.petName,productId:record.productId,proofStatus:record.proofStatus,proofImageUrl:"/api/proof/"+encodeURIComponent(matchProof[1])+"/image"},200,headers);
+  if(request.method==="POST"&&matchProof[2]==="respond"){
    const body=await request.json(),decision=body?.decision;
    if(!["approved","revision_requested"].includes(decision))return json({error:"Invalid decision"},400,headers);
    if(decision==="revision_requested"&&(!body.notes||String(body.notes).length>2000))return json({error:"Provide revision notes (up to 2000 characters)"},400,headers);
