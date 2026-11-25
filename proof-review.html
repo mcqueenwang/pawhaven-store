@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f6f1e8">
+<title>Review your PAWMOIRE design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#f6f1e8;--ink:#2e3028;--muted:#777568;--green:#3d5141;--rust:#b77c5c;--line:#ded5c7;--white:#fffdf8}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.65 'DM Sans',sans-serif}
+main{width:min(760px,calc(100% - 32px));margin:52px auto}.brand{font:500 18px 'Playfair Display',serif;letter-spacing:.2em;color:#514332}
+.panel{margin-top:24px;background:var(--white);border:1px solid var(--line);padding:clamp(22px,5vw,44px)}
+.eyebrow{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--rust);font-weight:700}
+h1{font:500 clamp(32px,6vw,48px)/1.1 'Playfair Display',serif;margin:12px 0}
+p{color:var(--muted);font-size:13px}.proof{margin:25px 0;background:#eee8dc;min-height:240px;display:grid;place-items:center}
+.proof img{display:block;max-width:100%;max-height:620px;object-fit:contain}
+.status{padding:12px 14px;background:#f1ede4;font-size:12px;margin:18px 0}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+button{min-height:46px;padding:0 20px;border:1px solid var(--green);font:600 10px 'DM Sans',sans-serif;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.approve{background:var(--green);color:white}.revise{background:transparent;color:var(--green)}
+textarea{width:100%;min-height:100px;padding:12px;border:1px solid var(--line);font:13px 'DM Sans',sans-serif}
+[hidden]{display:none!important}.message{margin-top:16px;font-size:12px;color:var(--green)}.error{color:#a34f3b}
+footer{margin-top:22px;color:var(--muted);font-size:10px}
+@media(max-width:520px){main{margin:28px auto}.actions{display:grid}button{width:100%}}
+</style></head>
+<body><main>
+<div class="brand">PAWMOIRE</div>
+<section class="panel">
+<div class="eyebrow">Your keepsake · Final design review</div>
+<h1 id="heading">Your design is ready to review.</h1>
+<p id="intro">Please take a close look at the personalized proof below. Production will only begin after you approve it.</p>
+<div class="status" id="status">Loading your private design proof…</div>
+<div class="proof" id="proof"><span>Loading proof…</span></div>
+<div id="decision">
+<p><strong>Does this look like your pet?</strong> If anything needs adjusting, tell our design team before approving.</p>
+<div class="actions">
+<button class="approve" id="approve" type="button">Approve design</button>
+<button class="revise" id="showRevision" type="button">Request a revision</button>
+</div>
+<div id="revision" hidden>
+<p>What would you like us to change?</p>
+<textarea id="revisionNotes" maxlength="2000" placeholder="For example: please keep the white marking on the nose and adjust the ear shape…"></textarea>
+<div class="actions"><button class="revise" id="sendRevision" type="button">Send revision request</button></div>
+</div></div>
+<div class="message" id="message" role="status" aria-live="polite"></div>
+</section><footer>Private review link · Please do not forward this link. It expires after 14 days.</footer>
+</main>
+<script>
+(()=> {
+ const params=new URLSearchParams(location.search),token=params.get('token'),api=(params.get('api')||location.origin).replace(/\/$/,'');
+ const $=id=>document.getElementById(id),endpoint='/api/proof/'+encodeURIComponent(token||'');
+ async function request(path,options={}){const r=await fetch(api+path,{...options,headers:{'content-type':'application/json',...(options.headers||{})}});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.error||'Unable to complete this request.');return data}
+ function fail(e){$('status').textContent=e.message;$('status').classList.add('error');$('message').textContent='Please contact PAWMOIRE if this link does not work.'}
+ async function init(){
+  if(!token){fail(new Error('This review link is incomplete.'));return}
+  try{
+   const data=await request(endpoint);
+   if(data.proofStatus!=='proof_sent')throw new Error('This design is no longer awaiting review.');
+   $('heading').textContent=data.petName?data.petName+"'s design is ready.":'Your design is ready to review.';
+   $('status').textContent='Please review the proof carefully. Your approval is required before production.';
+   const img=document.createElement('img');img.alt='Your PAWMOIRE personalized design proof';img.src=api+data.proofImageUrl;$('proof').replaceChildren(img);
+   img.onerror=()=>{$('proof').textContent='The proof image could not be loaded. Please contact PAWMOIRE.'};
+  }catch(e){fail(e)}
+ }
+ async function decide(decision,notes){
+  $('approve').disabled=true;$('showRevision').disabled=true;$('sendRevision').disabled=true;
+  try{await request(endpoint+'/respond',{method:'POST',body:JSON.stringify({decision,notes})});$('decision').hidden=true;$('status').textContent=decision==='approved'?'Thank you. Your design is approved. PAWMOIRE can now move it to production.':'Your revision request has been sent to PAWMOIRE. Production will wait until you approve an updated proof.';$('message').textContent='Your response has been recorded.'}
+  catch(e){$('approve').disabled=false;$('showRevision').disabled=false;$('sendRevision').disabled=false;fail(e)}
+ }
+ $('approve').addEventListener('click',()=>{if(confirm('Approve this design? Production may begin after approval.'))decide('approved','')});
+ $('showRevision').addEventListener('click',()=>{$('revision').hidden=false;$('revisionNotes').focus()});
+ $('sendRevision').addEventListener('click',()=>{const notes=$('revisionNotes').value.trim();if(!notes){$('message').textContent='Please describe the change you would like.';return}decide('revision_requested',notes)});
+ init();
+})();
+</script></body></html>
