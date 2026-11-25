@@ -1,3 +1,4 @@
+# PAWMOIRE photo proof test Worker. Uses Workers KV without an R2 binding.
 name = "pawmoire-api"
 main = "backend/cloudflare-worker.mjs"
 compatibility_date = "2026-11-25"
